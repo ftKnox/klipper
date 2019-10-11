@@ -574,7 +574,7 @@ class GCodeParser:
 
         #see if we specified a dwell time
         if 'S' in params:
-            self.toolhead.dwell(int(params['S']))
+            self.toolhead.dwell(self.get_float('S', params, above=0.))
 
         #grab the last move time
         last_move_time = self.toolhead.get_last_move_time()
