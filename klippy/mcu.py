@@ -600,8 +600,10 @@ class MCU:
             raise error("MCU '%s' error during config: %s" % (
                 self._name, self._shutdown_msg))
         if config_params['is_shutdown']:
-            raise error("Can not update MCU '%s' config as it is shutdown" % (
-                self._name,))
+            #try automatic restart
+            self._check_restart('firmware_reset')
+            #raise error("Can not update MCU '%s' config as it is shutdown" % (
+             #   self._name,))
         return config_params
     def _check_config(self):
         config_params = self._send_get_config()
