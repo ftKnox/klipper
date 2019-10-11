@@ -472,7 +472,7 @@ class GCodeParser:
                 key_param, key))
         values[key_param](params)
     all_handlers = [
-        'G1', 'G4', 'G28', 'M18', 'M400',
+        'G1', 'G4', 'G28', 'M17', 'M18', 'M400',
         'G20', 'M82', 'M83', 'G90', 'G91', 'G92', 'M114', 'M220', 'M221',
         'SET_GCODE_OFFSET', 'M206', 'SAVE_GCODE_STATE', 'RESTORE_GCODE_STATE',
         'M105', 'M104', 'M109', 'M140', 'M190', 'M106', 'M107',
@@ -533,10 +533,67 @@ class GCodeParser:
         for axis in homing_state.get_axes():
             self.base_position[axis] = self.homing_position[axis]
         self.reset_last_position()
+    def cmd_M17(self,params):
+        self.cmd_M18(params, 1)
     cmd_M18_aliases = ["M84"]
-    def cmd_M18(self, params):
-        # Turn off motors
-        self.toolhead.motor_off()
+    def cmd_M18(self, params, enable=0):
+        #pull the list of all steppers
+        steppers = self.toolhead.kin.get_steppers()
+        extruders = kinematics.extruder.get_printer_extruders(self.printer)
+
+        if not len(steppers) and not len(extruders):
+            #make sure at least one stepper exists
+            raise self.error("No steppers found in config!")
+
+        handle_steppers = []
+        for axis in 'XYZ':
+            if axis in params:
+                for stepper in steppers:
+                    suffix = '_%s' % axis.lower()
+                    if stepper.name.count(suffix):
+                        if params[axis]:
+                            #we specified a specific stepper on this axis
+                            if params[axis] != '0':
+                                suffix = '%s%s' % (suffix, params[axis])
+
+                            if stepper.name.endswith(suffix):
+                                handle_steppers.append(stepper)
+                        else:
+                            #operate on all steppers for this axis
+                            handle_steppers.append(stepper)
+
+        #check to see if we want to shutoff the extruder stepper(s)
+        if 'E' in params:
+            axis = 'E'
+            index = self.get_int('E', params, minval=0, maxval=len(extruders)-1)
+            
+            for idx in range(len(extruders)):
+                if index == idx:
+                    #found indicated stepper to handlle
+                    handle_steppers.append(extruders[idx].stepper)
+
+        #see if we specified a dwell time
+        if 'S' in params:
+            self.toolhead.dwell(int(params['S']))
+
+        #grab the last move time
+        last_move_time = self.toolhead.get_last_move_time()
+
+        if handle_steppers:
+            #handle the specified steppers now
+            for stepper in handle_steppers:
+                stepper.motor_enable(last_move_time, enable)
+        else:
+            #no steppers were specified
+            if enable:
+                #M17 command turn on all steppers
+                for stepper in steppers:
+                    stepper.motor_enable(last_move_time, enable)
+                for ext in extruders:
+                    ext.stepper.motor_enable(last_move_time, enable)
+            else:
+                #M18 command turn off all steppers
+                self.toolhead.motor_off()
     def cmd_M400(self, params):
         # Wait for current moves to finish
         self.toolhead.wait_moves()
