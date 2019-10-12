@@ -583,6 +583,9 @@ class GCodeParser:
         if 'S' in params:
             self.toolhead.dwell(self.get_float('S', params, above=0.))
 
+        #wait for any moves to complete
+        self.toolhead.wait_moves()
+        
         #grab the last move time
         last_move_time = self.toolhead.get_last_move_time()
 
