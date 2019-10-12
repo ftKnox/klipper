@@ -564,9 +564,16 @@ class GCodeParser:
 
         #check to see if we want to shutoff the extruder stepper(s)
         if 'E' in params:
-            axis = 'E'
-            index = self.get_int('E', params, minval=0, maxval=len(extruders)-1)
-            
+            index = 0
+            if params['E']:
+                try:
+                    index = int(params['E'])
+                except:
+                    raise self.error('Invalid extruder number "%s"' % params['E'])          
+
+                if index > len(extruders)-1:
+                    raise self.error('Invalid extruder number "%s"' % params['E'])
+
             for idx in range(len(extruders)):
                 if index == idx:
                     #found indicated stepper to handlle
